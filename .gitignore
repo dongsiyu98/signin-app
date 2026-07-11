@@ -6,6 +6,8 @@ signin.db-shm
 
 # 测试用数据库（测试时自动生成，勿入库）
 tests/*.db
+tests/*.db-wal
+tests/*.db-shm
 
 # 本地数据库备份（backup-db.js 产物，勿入库）
 backups/
