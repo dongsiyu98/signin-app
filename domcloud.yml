@@ -1,0 +1,16 @@
+# DOM Cloud 部署脚本
+# 用法：在 domcloud.co 建站时，把本文件内容粘贴到「部署脚本」，或关联 GitHub 后指定本仓库的 domcloud.yml
+# 文档：https://domcloud.co/docs/deployment/node
+features:
+  - node 22            # 必须用 >=22.5 的 Node，否则内置 node:sqlite 不可用
+nginx:
+  root: public_html/public
+passenger:
+  enabled: "on"
+  # 读 package.json 的 start（= node --experimental-sqlite server.js），PORT 由平台注入
+  app_start_command: env PORT=$PORT npm start
+  app_env: production
+  # JWT_SECRET 建议在本平台「环境变量」面板另行设置（.env 已 gitignore，不入库）
+  # 不设则用 server.js 兜底值 dev_secret_change_me（朋友间可用）
+commands:
+  - npm install        # 安装 express 等依赖
