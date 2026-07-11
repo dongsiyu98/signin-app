@@ -205,7 +205,7 @@ async function logout(){
 // ---------- 入口 ----------
 async function enter(){
   try{
-    if(!ME){ ME=await api('/api/me'); }
+    if(!ME){ const r=await api('/api/me'); ME=r.user; }
     document.getElementById('auth').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('whoami').textContent=ME.nickname;
@@ -308,6 +308,7 @@ async function showDetail(id){
 }
 function renderDetail(){
   const a=detail.activity, s=detail.me, sl=lbl(a,'score');
+  const isCreator = ME && a.creatorId === ME.id;
   let h=`<div class="title">${esc(a.icon||'📋')} ${esc(a.name)}</div><div class="sub">${esc(a.description||'')}　·　发起人 ${esc(a.creator||'')}</div>`;
 
   // 参与情况
@@ -371,6 +372,22 @@ function renderDetail(){
       <button class="${rankMode==='streak'?'on':''}" onclick="setRank('streak')">连续天数</button>
     </div>${rankHTML(a)}</div>`;
 
+  // 举办人：给参与者发放补签卡
+  if(isCreator){
+    h+=`<div class="card"><div class="b">发放${lbl(a,'card')}</div>
+      <div class="xs muted" style="margin:4px 0 6px">你是活动举办人，可手动给参加者补发${lbl(a,'card')}（与系统按第 ${a.cardDays.join('/')} 天自动发放互不冲突）</div>`;
+    const ps=detail.participants||[];
+    if(!ps.length){ h+=`<div class="xs muted">还没有人参加</div>`; }
+    ps.forEach(p=>{
+      h+=`<div class="row between" style="padding:9px 0;border-top:1px solid var(--line)">
+        <div style="flex:1"><div class="b">${esc(p.nickname)}${p.isMe?' <span class="tag on">我</span>':''}</div>
+        <div class="xs muted">持有 ${p.cardsHeld} 张</div></div>
+        <button class="btn btn-ghost btn-sm" style="flex:none;margin-left:10px" onclick="grantCard('${a.id}','${p.uid}')">发 1 张</button>
+      </div>`;
+    });
+    h+=`</div>`;
+  }
+
   // 退出活动（参加后才显示，放在排行榜下方）
   if(s){
     h+=`<button class="btn btn-ghost" style="width:100%;color:var(--red);background:#fbeae5;margin-top:14px" onclick="leaveAct('${a.id}')">退出活动</button>`;
@@ -414,6 +431,13 @@ async function leaveAct(id){
 async function confirmLeave(id){
   try{ await api('/api/activities/'+id+'/leave',{method:'POST'}); closeModal(); toast('已退出活动'); await showDetail(id); }
   catch(e){ toast(e.message); }
+}
+async function grantCard(activityId, userId){
+  try{
+    const d=await api('/api/activities/'+activityId+'/grant-card',{method:'POST',body:{userId, count:1}});
+    toast('已发 1 张'+lbl(detail.activity,'card')+'，该用户现持有 '+d.cardsHeld+' 张');
+    await showDetail(activityId);
+  }catch(e){ toast(e.message); }
 }
 
 // ---------- 签到 / 补签 ----------

@@ -349,6 +349,35 @@ curl -X POST http://localhost:3000/api/activities \
 
 > 退出会**删除该参与记录及其全部签到记录**（真实签到、补签卡补签均清空），奖金、补签卡随之归零，且不可恢复。系统仅作记分，**不涉及真实款项退还**（参与金为线下私下转账，需你与发起人自行协商）。前端会在退出前弹二次确认。
 
+### 4.5 举办人发放补签卡
+`POST /api/activities/:id/grant-card`  🔒 需登录 · **仅活动举办人（creator）可调用**
+
+**路径参数**：`id` 活动 ID
+
+**请求体**
+```json
+{ "userId": "参与者用户ID", "count": 1 }
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| userId | string | 是 | 被发放者的用户 ID（必须是本活动参与者） |
+| count | integer | 是 | 发放数量，正整数，单次上限 50 |
+
+**成功响应** `200`
+```json
+{ "ok": true, "userId": "参与者用户ID", "cardsBonus": 3, "cardsHeld": 3 }
+```
+- `cardsBonus`：该参与者累计被举办人补发的数量
+- `cardsHeld`：该参与者当前持有的补签卡总数（`= 系统按 cardDays 自动发放 + cardsBonus − 已使用`）
+
+**错误**
+- `404` 活动不存在
+- `403` 只有活动举办人才能发放补签卡（非举办人调用）
+- `400` 该用户未参加本活动 / 发放数量须为正整数 / 单次发放不能超过 50 张
+
+> 举办人补发与系统按 `cardDays`（第 7/14/21/28 天）自动发放**互不冲突**，各自独立累计，最终合并到持有数。纯记分，无真实成本。前端在活动详情页（仅举办人可见）提供「发放补签卡」面板，逐人点击「发 1 张」即可。
+
 ---
 
 ## 五、公共数据结构
@@ -452,5 +481,6 @@ curl -X POST http://localhost:3000/api/activities \
 | 10 | POST | `/api/activities/:id/checkin` | 登录 | 每日签到 |
 | 11 | POST | `/api/activities/:id/makeup` | 登录 | 补签 |
 | 12 | POST | `/api/activities/:id/leave` | 登录 | 退出活动 |
+| 13 | POST | `/api/activities/:id/grant-card` | 登录(举办人) | 举办人发放补签卡 |
 
 > 所有未匹配上述路径的 `GET *` 一律返回前端 `index.html`（SPA 兜底）。

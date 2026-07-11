@@ -71,6 +71,31 @@ const ACT = {
   r = await call('POST', `/api/activities/${aid}/join`, tokA, { paid: true });
   check('小明重复参加 -> 409', r.status === 409, 'HTTP ' + r.status);
 
+  // ===== 举办人发放补签卡 =====
+  // creator = 小明(tokA)。取参与者小红的 uid
+  let det = await call('GET', `/api/activities/${aid}`, tokA);
+  const xh = det.data && det.data.participants && det.data.participants.find(p => p.nickname === '小红');
+  check('能取到参与者小红 uid', !!(xh && xh.uid), 'uid=' + (xh && xh.uid));
+  const before = xh ? xh.cardsHeld : 0;
+  // 举办人给小红发1张 -> 200，cardsHeld+1
+  r = await call('POST', `/api/activities/${aid}/grant-card`, tokA, { userId: xh.uid, count: 1 });
+  check('举办人发补签卡 -> 200', ok2xx(r.status), 'HTTP ' + r.status);
+  check('发放1张后 cardsHeld+1', r.data && r.data.cardsHeld === before + 1, 'cardsHeld=' + (r.data && r.data.cardsHeld));
+  // 再发2张 -> cardsHeld+3
+  r = await call('POST', `/api/activities/${aid}/grant-card`, tokA, { userId: xh.uid, count: 2 });
+  check('再发2张后 cardsHeld+3', r.data && r.data.cardsHeld === before + 3, 'cardsHeld=' + (r.data && r.data.cardsHeld));
+  // 非举办人(小红)发放 -> 403
+  r = await call('POST', `/api/activities/${aid}/grant-card`, tokB, { userId: xh.uid, count: 1 });
+  check('非举办人发放 -> 403', r.status === 403, 'HTTP ' + r.status);
+  // 给未参加用户发放 -> 400
+  r = await call('POST', `/api/activities/${aid}/grant-card`, tokA, { userId: 'no_such_user_123', count: 1 });
+  check('给未参加用户发放 -> 400', r.status === 400, 'HTTP ' + r.status);
+  // 数量非法 -> 400
+  r = await call('POST', `/api/activities/${aid}/grant-card`, tokA, { userId: xh.uid, count: 0 });
+  check('发放数量=0 -> 400', r.status === 400, 'HTTP ' + r.status);
+  r = await call('POST', `/api/activities/${aid}/grant-card`, tokA, { userId: xh.uid, count: 'abc' });
+  check('发放数量非数字 -> 400', r.status === 400, 'HTTP ' + r.status);
+
   // 未授权创建活动
   r = await call('POST', '/api/activities', null, ACT);
   check('未授权创建活动 -> 401', r.status === 401, 'HTTP ' + r.status);

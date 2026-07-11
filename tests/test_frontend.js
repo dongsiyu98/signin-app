@@ -100,6 +100,21 @@ function ok(name, cond, extra) { console.log(`${cond ? '✅' : '❌'} ${name}${e
   const det4 = await window.api('/api/activities/' + aid);
   ok('重复签到记分不变', det4.me.score === prev, `score=${det4.me.score}`);
 
+  // 7.5 举办人发放补签卡（UI 流程：当前用户是活动创建者）
+  await window.showDetail(aid); await wait(120);
+  let vh2 = document.getElementById('view').innerHTML;
+  ok('举办人可见「发放补签卡」面板', vh2.includes('发放补签卡'));
+  ok('发放面板含「发 1 张」按钮', vh2.includes('onclick="grantCard('));
+  // 点击「发 1 张」-> 调用 grantCard -> 该参与者 cardsHeld +1
+  const detM = await window.api('/api/activities/' + aid);
+  const meP = detM.participants.find(p => p.isMe) || detM.participants[0];
+  const beforeCards = meP ? meP.cardsHeld : 0;
+  await window.grantCard(aid, meP.uid);
+  await wait(180);
+  const detM2 = await window.api('/api/activities/' + aid);
+  const afterCards = detM2.participants.find(p => p.uid === meP.uid).cardsHeld;
+  ok('发1张后该参与者 cardsHeld+1', afterCards === beforeCards + 1, `before=${beforeCards} after=${afterCards}`);
+
   // 8. 退出活动（UI 流程：详情页应有「退出活动」按钮 -> 点击弹确认 -> 确认后退出）
   await window.showDetail(aid); await wait(120);
   let vh = document.getElementById('view').innerHTML;

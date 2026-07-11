@@ -76,5 +76,21 @@ check('11.超周期inCycle', s.inCycle, false);
 s = computeState(A, P('2026-07-10'), [], '2026-07-01');
 check('12.参加日前inCycle', s.inCycle, false);
 
+// 13. 补发卡(cards_bonus)：未到任何发卡日，手动补发3张 -> 持有3
+s = computeState(A, { join_date: '2026-07-01', cards_used: 0, cards_bonus: 3 }, [], '2026-07-01');
+check('13.补发3张未到发卡日', s.cardsHeld, 3);
+
+// 14. 补发卡 + 用掉1张 -> 剩余2
+s = computeState(A, { join_date: '2026-07-01', cards_used: 1, cards_bonus: 3 }, [], '2026-07-01');
+check('14.补发3张用掉1张', s.cardsHeld, 2);
+
+// 15. 补发卡 + 正常发卡日叠加：第7天正常发1张 + 补发2张 -> 持有3
+s = computeState(A, { join_date: '2026-07-01', cards_used: 0, cards_bonus: 2 }, [], '2026-07-07');
+check('15.补发2张叠加第7天正常发卡', s.cardsHeld, 3);
+
+// 16. 用掉超过(已发+补发) -> 不小于0
+s = computeState(A, { join_date: '2026-07-01', cards_used: 5, cards_bonus: 3 }, [], '2026-07-01');
+check('16.用超不为负', s.cardsHeld, 0);
+
 console.log(`\n=== 规则引擎测试（里程碑式）：${pass} 通过 / ${fail} 失败 ===`);
 process.exit(fail ? 1 : 0);

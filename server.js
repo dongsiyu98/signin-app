@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS participations (
   join_date TEXT NOT NULL,
   fee_paid INTEGER NOT NULL DEFAULT 1,
   cards_used INTEGER NOT NULL DEFAULT 0,
+  cards_bonus INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   UNIQUE(activity_id, user_id)
 );
@@ -165,7 +166,7 @@ function computeState(a, p, checkins, today) {
     const issueDate = addDays(p.join_date, cd - 1);
     if (diffDays(issueDate, today) >= 0) issued++;
   }
-  const cardsHeld = Math.max(0, issued - (p.cards_used || 0));
+  const cardsHeld = Math.max(0, issued + (p.cards_bonus || 0) - (p.cards_used || 0));
 
   const refunded = a.fee > 0 && realDays >= a.refundRealDays;
 
@@ -242,12 +243,12 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/me', auth, ensureUser, (req, res) => res.json({ user: { id: req.user.id, nickname: req.user.nickname } }));
 app.get('/api/me/activities', auth, ensureUser, (req, res) => {
   const today = todayDate();
-  const rows = db.prepare(`SELECT a.*, u.nickname AS creator, p.id AS pid, p.join_date, p.fee_paid, p.cards_used
+  const rows = db.prepare(`SELECT a.*, u.nickname AS creator, p.id AS pid, p.join_date, p.fee_paid, p.cards_used, p.cards_bonus
     FROM participations p JOIN activities a ON a.id=p.activity_id LEFT JOIN users u ON u.id=a.creator_id
     WHERE p.user_id=? ORDER BY p.join_date DESC`).all(req.uid);
   const out = rows.map(r => {
     const a = arow(r); a.creator = r.creator;
-    const p = { join_date: r.join_date, fee_paid: r.fee_paid, cards_used: r.cards_used };
+    const p = { join_date: r.join_date, fee_paid: r.fee_paid, cards_used: r.cards_used, cards_bonus: r.cards_bonus };
     const ch = db.prepare('SELECT * FROM checkins WHERE participation_id=?').all(r.pid);
     return { activity: a, state: computeState(a, p, ch, today) };
   });
@@ -321,7 +322,7 @@ app.post('/api/activities/:id/join', auth, ensureUser, (req, res) => {
     return res.status(409).json({ error: '你已参加该活动' });
   const joinDate = todayDate();
   const feePaid = req.body && req.body.paid === false ? 0 : 1;
-  db.prepare('INSERT INTO participations(id,activity_id,user_id,join_date,fee_paid,cards_used,created_at) VALUES(?,?,?,?,?,0,?)')
+  db.prepare('INSERT INTO participations(id,activity_id,user_id,join_date,fee_paid,cards_used,cards_bonus,created_at) VALUES(?,?,?,?,?,0,0,?)')
     .run(uid(), a.id, req.uid, joinDate, feePaid, nowISO());
   res.json({ ok: true });
 });
@@ -373,6 +374,24 @@ app.post('/api/activities/:id/leave', auth, ensureUser, (req, res) => {
   db.prepare('DELETE FROM checkins WHERE participation_id=?').run(p.id);
   db.prepare('DELETE FROM participations WHERE id=?').run(p.id);
   res.json({ ok: true });
+});
+
+// 举办人给参与者发放补签卡（叠加 cards_bonus，与系统按 cardDays 自动发放互不冲突）
+app.post('/api/activities/:id/grant-card', auth, ensureUser, (req, res) => {
+  const a = arow(db.prepare('SELECT * FROM activities WHERE id=?').get(req.params.id));
+  if (!a) return res.status(404).json({ error: '活动不存在' });
+  if (a.creatorId !== req.uid) return res.status(403).json({ error: '只有活动举办人才能发放补签卡' });
+  const userId = (req.body && req.body.userId) || '';
+  const count = Math.floor(Number((req.body && req.body.count) || 0));
+  if (!Number.isInteger(count) || count < 1) return res.status(400).json({ error: '发放数量须为正整数' });
+  if (count > 50) return res.status(400).json({ error: '单次发放不能超过 50 张' });
+  const p = db.prepare('SELECT * FROM participations WHERE activity_id=? AND user_id=?').get(a.id, userId);
+  if (!p) return res.status(400).json({ error: '该用户未参加本活动' });
+  db.prepare('UPDATE participations SET cards_bonus = cards_bonus + ? WHERE id=?').run(count, p.id);
+  const p2 = db.prepare('SELECT * FROM participations WHERE id=?').get(p.id);
+  const ch = db.prepare('SELECT * FROM checkins WHERE participation_id=?').all(p.id);
+  const s = computeState(a, p2, ch, todayDate());
+  res.json({ ok: true, userId, cardsBonus: p2.cards_bonus, cardsHeld: s.cardsHeld });
 });
 
 // SPA 兜底
