@@ -1,0 +1,16 @@
+node_modules/
+signin.db
+signin.db-wal
+signin.db-shm
+.env
+
+# 测试用数据库（测试时自动生成，勿入库）
+tests/*.db
+
+# 本地数据库备份（backup-db.js 产物，勿入库）
+backups/
+signin.db.bak.*
+
+# 日志与系统文件
+*.log
+.DS_Store

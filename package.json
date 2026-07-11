@@ -1,0 +1,21 @@
+{
+  "name": "signin-app",
+  "version": "1.0.0",
+  "description": "朋友一起签到打卡（真实前后端版，Node + Express + 内置 SQLite）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js",
+    "dev": "node --experimental-sqlite server.js",
+    "test": "node --experimental-sqlite tests/test_all.js",
+    "test:rules": "node --experimental-sqlite tests/test_rules.js",
+    "test:api": "node --experimental-sqlite tests/test_api.js",
+    "test:boundary": "node --experimental-sqlite tests/test_boundary.js",
+    "test:frontend": "node --experimental-sqlite tests/test_frontend.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

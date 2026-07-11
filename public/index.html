@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>签到打卡</title>
+<style>
+  :root{
+    --paper:#f6f1e7; --card:#fffdf8; --ink:#2b2620; --muted:#8a7f6f;
+    --line:#e7ded0; --accent:#c9772f; --accent-dark:#a85f1f;
+    --gold:#c99a2e; --green:#3d8c5f; --red:#c0492f; --blue:#3a6ea5;
+    --shadow:0 2px 10px rgba(80,60,30,.08);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.6;scrollbar-gutter:stable}
+  .hidden{display:none!important}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;font-size:15px}
+  input,select,textarea{font-family:inherit;font-size:15px;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);outline:none}
+  input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
+  .btn{background:var(--accent);color:#fff;padding:11px 16px;font-weight:600;transition:.15s}
+  .btn:hover{background:var(--accent-dark)}
+  .btn:disabled{background:#cdbfa8;cursor:not-allowed}
+  .btn-ghost{background:#f0e8d8;color:var(--ink)}
+  .btn-ghost:hover{background:#e7ddc9}
+  .btn-sm{padding:7px 12px;font-size:13px;border-radius:8px}
+  .wrap{max-width:640px;margin:0 auto;padding:0 14px 90px}
+  #view{max-width:640px;margin:0 auto;padding:0 14px 90px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+  .row{display:flex;align-items:center;gap:10px}
+  .between{justify-content:space-between}
+  .muted{color:var(--muted)}
+  .sm{font-size:13px}
+  .xs{font-size:12px}
+  .b{font-weight:600}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;background:#f0e8d8;color:var(--muted)}
+  .tag.on{background:#e8f3ec;color:var(--green)}
+  .tag.gold{background:#f7efd6;color:var(--gold)}
+  .tag.hot{background:#fbe8dd;color:var(--accent-dark)}
+
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(246,241,231,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .topbar .in{max-width:640px;margin:0 auto;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .brand{font-weight:700;font-size:17px;letter-spacing:.5px}
+  .whoami{font-size:13px;color:var(--muted)}
+  .whoami b{color:var(--accent-dark)}
+
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);display:flex}
+  .tabbar a{flex:1;text-align:center;padding:9px 0 10px;color:var(--muted);text-decoration:none;font-size:11px}
+  .tabbar a .ic{display:block;font-size:19px;line-height:1.3}
+  .tabbar a.active{color:var(--accent-dark)}
+
+  .title{font-size:20px;font-weight:700;margin:16px 2px 10px}
+  .sub{color:var(--muted);font-size:13px;margin:-6px 2px 14px}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px}
+
+  .act-card{cursor:pointer;transition:.15s}
+  .act-card:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(80,60,30,.12)}
+  .progress{height:8px;background:#eee3d0;border-radius:999px;overflow:hidden;margin-top:8px}
+  .progress>i{display:block;height:100%;background:var(--accent);border-radius:999px}
+
+  .stat{flex:1;text-align:center;padding:10px 4px;background:#faf5ea;border-radius:12px}
+  .stat .n{font-size:22px;font-weight:700;color:var(--accent-dark);line-height:1.1}
+  .stat .l{font-size:11.5px;color:var(--muted);margin-top:3px}
+
+  .checkin-big{width:100%;padding:16px;font-size:17px;font-weight:700;border-radius:14px;margin:14px 0}
+  .done-badge{background:#e8f3ec;color:var(--green);text-align:center;padding:12px;border-radius:14px;font-weight:600;font-size:15px;margin:14px 0}
+
+  .tier-row{display:flex;gap:6px;margin-top:10px}
+  .tier{flex:1;text-align:center;padding:8px 2px;border-radius:10px;background:#faf5ea;border:1px solid var(--line);font-size:12px}
+  .tier.cur{background:#fbe8dd;border-color:var(--accent);color:var(--accent-dark);font-weight:600}
+  .tier .a{font-size:15px;font-weight:700}
+
+  .mile{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .mile:last-child{border-bottom:none}
+  .mile .dot{width:26px;height:26px;border-radius:50%;background:#eee3d0;color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none}
+  .mile.reached .dot{background:var(--gold);color:#fff}
+
+  .rank-item{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line)}
+  .rank-item:last-child{border-bottom:none}
+  .rank-no{width:26px;height:26px;border-radius:50%;background:#f0e8d8;color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none}
+  .rank-no.g1{background:#e9c14a;color:#fff}.rank-no.g2{background:#c8cdd4;color:#fff}.rank-no.g3{background:#d7a06a;color:#fff}
+  .seg{display:flex;background:#f0e8d8;border-radius:10px;padding:3px;margin:4px 0 14px}
+  .seg button{flex:1;background:transparent;color:var(--muted);padding:7px;font-size:13px;border-radius:8px}
+  .seg button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:var(--shadow)}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(43,38,32,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  .modal{background:var(--card);width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:20px 20px calc(24px + env(safe-area-inset-bottom, 0));max-height:82vh;overflow:auto}
+  @media(min-width:641px){.modal-bg{align-items:center}.modal{border-radius:18px;padding-bottom:24px}}
+  .drag{width:38px;height:4px;border-radius:999px;background:#e0d6c4;margin:0 auto 14px}
+  .chk{display:flex;align-items:center;gap:10px;padding:14px 14px;border:1px solid var(--line);border-radius:12px;margin-top:10px;cursor:pointer;transition:.15s;user-select:none;-webkit-user-select:none}
+  .chk:hover,.chk:active{background:#faf5ea;border-color:var(--accent)}
+  .chk input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+  .daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
+  .daycell{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;border:1px solid var(--line);background:#faf5ea}
+  .daycell.done{background:#e8f3ec;border-color:#bfe0cc;color:var(--green)}
+  .daycell.makeup{background:#eef2fb;border-color:#c6d6ee;color:var(--blue)}
+  .daycell.miss{background:#fbeae5;border-color:#eecabd;color:var(--red)}
+  .daycell.future{opacity:.4}
+  .daycell.pick{cursor:pointer}
+  .daycell.pick:hover{outline:2px solid var(--accent)}
+  .daycell .d{font-weight:700;font-size:13px}
+  .toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#2b2620;color:#fff;padding:10px 18px;border-radius:999px;font-size:13.5px;z-index:99;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1;bottom:86px}
+  .link{color:var(--accent-dark);cursor:pointer;font-size:13px}
+
+  .tmpl-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+  .tmpl-card{border:2px solid var(--line);border-radius:12px;padding:12px 6px;text-align:center;cursor:pointer;transition:.15s}
+  .tmpl-card:hover{border-color:var(--accent)}
+  .tmpl-card.sel{border-color:var(--accent);background:#fbe8dd}
+  .tmpl-card .ti{font-size:24px;margin-bottom:4px}
+  .tmpl-card .tn{font-weight:600;font-size:13px}
+  .tmpl-card .td{font-size:11px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+
+<!-- ========== AUTH ========== -->
+<div id="auth" class="hidden">
+  <div style="max-width:400px;margin:0 auto;padding:48px 20px">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:40px">📋</div>
+      <div class="brand" style="font-size:24px;margin-top:6px">签到打卡</div>
+      <div class="muted sm">和朋友一起打卡 · 坚持记分</div>
+    </div>
+    <div class="card">
+      <div id="authTitle" class="b" style="font-size:16px;margin-bottom:6px">登录</div>
+      <label>昵称</label>
+      <input id="au_name" placeholder="输入昵称">
+      <label>密码</label>
+      <input id="au_pass" type="password" placeholder="输入密码">
+      <button class="btn" style="width:100%;margin-top:16px" onclick="doAuth()">进入</button>
+      <div style="text-align:center;margin-top:12px">
+        <span class="link" id="au_switch" onclick="toggleAuth()">没有账号？去注册</span>
+      </div>
+      <div class="xs muted" style="text-align:center;margin-top:14px;line-height:1.5">
+        数据保存在云端服务器，和朋友实时同步。<br>请使用真实昵称，注册后即可发布和参加活动。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== APP ========== -->
+<div id="app" class="hidden">
+  <div class="topbar">
+    <div class="in">
+      <span class="brand">📋 签到打卡</span>
+      <span class="whoami">你好，<b id="whoami"></b> · <span class="link" onclick="logout()">退出</span></span>
+    </div>
+  </div>
+  <div id="view"></div>
+  <div class="tabbar">
+    <a href="javascript:showList()" id="nav_list"><span class="ic">🏠</span>活动</a>
+    <a href="javascript:showNew()" id="nav_new"><span class="ic">➕</span>发布</a>
+    <a href="javascript:showMe()" id="nav_me"><span class="ic">👤</span>我的</a>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+let TOKEN = localStorage.getItem('token') || '';
+let ME = null;            // {id,nickname}
+let view = 'list';
+let detail = null;        // {activity, me, participants}
+let rankMode = 'score';
+let pendingCheckin = null;
+let pendingMakeup = null;
+let selTmplKey = null;
+
+const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lbl(a,k){ return ((a&&a.labels)||{})[k] || ({score:'积分',fee:'参与金',feeRefund:'已退参与金',poolAdd:'奖池加注',card:'补签卡'})[k] || k; }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
+function modal(inner){ document.getElementById('modalRoot').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="drag"></div>${inner}</div></div>`; }
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+async function api(path, opts={}){
+  const headers={'Content-Type':'application/json'};
+  if(TOKEN) headers['Authorization']='Bearer '+TOKEN;
+  const r=await fetch(path,{...opts,headers,body:opts.body?JSON.stringify(opts.body):undefined});
+  let data={};
+  try{ data=await r.json(); }catch(e){}
+  if(!r.ok) throw new Error(data.error||('请求失败('+r.status+')'));
+  return data;
+}
+
+// ---------- 鉴权 ----------
+let authMode='login';
+function toggleAuth(){ authMode=authMode==='login'?'register':'login'; document.getElementById('authTitle').textContent=authMode==='login'?'登录':'注册'; document.getElementById('au_switch').textContent=authMode==='login'?'没有账号？去注册':'已有账号？去登录'; }
+async function doAuth(){
+  const nickname=document.getElementById('au_name').value.trim();
+  const password=document.getElementById('au_pass').value;
+  if(!nickname||!password){ toast('请填写昵称和密码'); return; }
+  try{
+    const data=await api('/api/auth/'+authMode,{method:'POST',body:{nickname,password}});
+    TOKEN=data.token; localStorage.setItem('token',TOKEN); ME=data.user; enter();
+  }catch(e){ toast(e.message); }
+}
+async function logout(){
+  try{ await api('/api/auth/logout',{method:'POST'}); }catch(e){}
+  TOKEN=''; localStorage.removeItem('token'); ME=null; location.reload();
+}
+
+// ---------- 入口 ----------
+async function enter(){
+  try{
+    if(!ME){ ME=await api('/api/me'); }
+    document.getElementById('auth').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('whoami').textContent=ME.nickname;
+    showList();
+  }catch(e){ TOKEN=''; localStorage.removeItem('token'); boot(); }
+}
+function boot(){ document.getElementById('auth').classList.remove('hidden'); document.getElementById('app').classList.add('hidden'); }
+
+// ---------- 活动列表 ----------
+async function showList(){
+  view='list'; setNav('nav_list');
+  const wrap=document.getElementById('view'); wrap.innerHTML='<div class="title">活动广场</div><div class="sub">所有人发布的打卡活动，点开即可参加</div><div class="empty">加载中…</div>';
+  let list;
+  try{ list=await api('/api/activities'); }catch(e){ wrap.innerHTML='<div class="empty">'+esc(e.message)+'</div>'; return; }
+  if(!list.length){ wrap.innerHTML='<div class="title">活动广场</div><div class="sub">还没有活动，去「发布」创建一个吧</div><div class="empty">📭 暂无活动</div>'; return; }
+  let h='<div class="title">活动广场</div><div class="sub">所有人发布的打卡活动，点开即可参加</div>';
+  list.forEach(a=>{
+    h+=`<div class="card act-card" onclick="showDetail('${a.id}')">
+      <div class="row between"><div class="b" style="font-size:16px">${a.icon||'📋'} ${esc(a.name)}</div><span class="tag">${a.cycleDays}天</span></div>
+      <div class="xs muted" style="margin-top:5px">${esc(a.description||'')}</div>
+      <div class="xs muted" style="margin-top:6px">发起人 ${esc(a.creator||'未知')} · 已参加 ${a.participantCount} 人${a.fee>0?' · '+a.fee+lbl(a,'fee'):''}</div>
+    </div>`;
+  });
+  wrap.innerHTML=h;
+}
+
+// ---------- 发布活动 ----------
+const TEMPLATES=[
+  {key:'writer',icon:'✍️',name:'作家签到',desc:'30天写作打卡',p:{name:'作家签到·30天',cycleDays:30,fee:25,refundRealDays:5,taskReq:'完成至少1小时小说任务',icon:'✍️',tiers:[{day:5,per:5},{day:10,per:10},{day:20,per:15},{day:30,per:20}],milestones:[{day:5,add:25},{day:10,add:50},{day:20,add:150},{day:30,add:200}],cardDays:[7,14,21,28],labels:{score:'奖金',fee:'参与金',feeRefund:'已退参与金',poolAdd:'奖池加注',card:'补签卡'}}},
+  {key:'weight',icon:'🏃',name:'减肥打卡',desc:'30天身材管理',p:{name:'减肥打卡·30天',cycleDays:30,fee:30,refundRealDays:7,taskReq:'完成今日运动/饮食打卡',icon:'🏃',tiers:[{day:5,per:2},{day:10,per:4},{day:20,per:6},{day:30,per:10}],milestones:[{day:5,add:20},{day:10,add:40},{day:20,add:60},{day:30,add:100}],cardDays:[7,14,21,28],labels:{score:'积分',fee:'保证金',feeRefund:'已退保证金',poolAdd:'奖池加注',card:'补签卡'}}},
+  {key:'early',icon:'🌅',name:'早起打卡',desc:'21天早起习惯',p:{name:'早起打卡·21天',cycleDays:21,fee:0,refundRealDays:0,taskReq:'早于 7:00 起床',icon:'🌅',tiers:[{day:7,per:1},{day:14,per:2},{day:21,per:3}],milestones:[{day:7,add:10},{day:14,add:20},{day:21,add:30}],cardDays:[7,14],labels:{score:'星星',fee:'参与金',feeRefund:'已退参与金',poolAdd:'奖池加注',card:'复活卡'}}}
+];
+function showNew(){ view='new'; setNav('nav_new'); renderNew(); }
+function renderNew(){
+  let html=`<div class="title">发布活动</div><div class="sub">选一个模板快速创建，或自定义每一项</div>`;
+  html+=`<div class="card"><div class="b">选模板（点一下自动填表）</div><div class="tmpl-grid">`;
+  TEMPLATES.forEach(tm=>{
+    const p=tm.p;
+    const mileTxt=p.milestones.map(m=>m.day+'天→'+m.add).join(' / ');
+    html+=`<div class="tmpl-card ${selTmplKey===tm.key?'sel':''}" onclick="pickTmpl('${tm.key}')">
+      <div class="ti">${tm.icon}</div><div class="tn">${tm.name}</div>
+      <div class="td">${p.cycleDays}天 · ${p.fee>0?('参与金'+p.fee):'无参与金'}<br>${mileTxt}</div></div>`;
+  });
+  html+=`</div></div>`;
+  const base=selTmplKey?JSON.parse(JSON.stringify(TEMPLATES.find(t=>t.key===selTmplKey).p)):{name:'',cycleDays:30,fee:0,refundRealDays:5,taskReq:'',icon:'📋',tiers:[{day:5,per:5},{day:10,per:10},{day:20,per:15},{day:30,per:20}],milestones:[{day:5,add:25},{day:10,add:50},{day:20,add:150},{day:30,add:200}],cardDays:[7,14,21,28],labels:{score:'积分',fee:'参与金',feeRefund:'已退参与金',poolAdd:'奖池加注',card:'补签卡'}};
+  document.getElementById('view').innerHTML=html + `
+    <div class="card">
+      <label>活动名称</label><input id="n_name" value="${esc(base.name)}">
+      <label>图标 emoji</label><input id="n_icon" value="${esc(base.icon)}">
+      <label>简介</label><textarea id="n_desc" rows="2" placeholder="一句话说明">${esc(base.desc||'')}</textarea>
+      <div class="row" style="gap:10px">
+        <div style="flex:1"><label>周期天数</label><input id="n_cycle" type="number" value="${base.cycleDays}"></div>
+        <div style="flex:1"><label>参与金（0=无）</label><input id="n_fee" type="number" value="${base.fee}"></div>
+      </div>
+      <label>累计真实签到多少天退还参与金</label><input id="n_refund" type="number" value="${base.refundRealDays}">
+      <label>每日任务要求</label><input id="n_task" value="${esc(base.taskReq)}">
+      <label>奖金里程碑（连续满 N 天获得多少 ${lbl(base,'score')}，用「天:金额」一行一个）</label>
+      <textarea id="n_miles" rows="4">${base.milestones.map(m=>m.day+':'+m.add).join('\n')}</textarea>
+      <div class="xs muted" style="margin-top:4px">示例：5:25 表示连续满5天得25${lbl(base,'score')}；未达门槛当天为0</div>
+      <label>补签卡发放日（第几天，逗号分隔）</label><input id="n_cards" value="${base.cardDays.join(',')}">
+      <label>文案标签</label>
+      <div class="row" style="gap:8px">
+        <input id="n_lb_score" placeholder="记分名" value="${esc(base.labels.score)}">
+        <input id="n_lb_fee" placeholder="参与金名" value="${esc(base.labels.fee)}">
+      </div>
+      <button class="btn" style="width:100%;margin-top:16px" onclick="createAct()">发布活动</button>
+    </div>`;
+}
+function pickTmpl(key){ selTmplKey=key; renderNew(); }
+function parsePairs(str){ return str.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>{ const [a,b]=s.split(':'); return {day:parseInt(a,10),v:parseInt(b,10)}; }).filter(o=>o.day>0&&!isNaN(o.v)); }
+async function createAct(){
+  const milestones=parsePairs(document.getElementById('n_miles').value).map(o=>({day:o.day,add:o.v}));
+  // tiers 从里程碑自动推导（保持数据库兼容）
+  const tiers=milestones.map(m=>({day:m.day,per:Math.round(m.add/m.day)}));
+  const cardDays=document.getElementById('n_cards').value.split(',').map(s=>parseInt(s.trim(),10)).filter(n=>n>0);
+  const payload={
+    name:document.getElementById('n_name').value.trim(),
+    icon:document.getElementById('n_icon').value.trim()||'📋',
+    description:document.getElementById('n_desc').value.trim(),
+    cycleDays:parseInt(document.getElementById('n_cycle').value,10),
+    fee:parseInt(document.getElementById('n_fee').value,10)||0,
+    refundRealDays:parseInt(document.getElementById('n_refund').value,10)||0,
+    taskReq:document.getElementById('n_task').value.trim(),
+    tiers, milestones, cardDays,
+    labels:{score:document.getElementById('n_lb_score').value.trim()||'积分',fee:document.getElementById('n_lb_fee').value.trim()||'参与金',feeRefund:'已退'+(document.getElementById('n_lb_fee').value.trim()||'参与金'),poolAdd:'奖池加注',card:'补签卡'}
+  };
+  if(!payload.name){ toast('请填写活动名称'); return; }
+  if(milestones.length===0){ toast('奖金里程碑不能为空'); return; }
+  try{ const d=await api('/api/activities',{method:'POST',body:payload}); toast('发布成功'); showDetail(d.id); }
+  catch(e){ toast(e.message); }
+}
+
+// ---------- 活动详情 ----------
+async function showDetail(id){
+  view='detail'; setNav('nav_list');
+  const wrap=document.getElementById('view'); wrap.innerHTML='<div class="empty">加载中…</div>';
+  let data;
+  try{ data=await api('/api/activities/'+id); }catch(e){ wrap.innerHTML='<div class="empty">'+esc(e.message)+'</div>'; return; }
+  detail=data; renderDetail();
+}
+function renderDetail(){
+  const a=detail.activity, s=detail.me, sl=lbl(a,'score');
+  let h=`<div class="title">${esc(a.icon||'📋')} ${esc(a.name)}</div><div class="sub">${esc(a.description||'')}　·　发起人 ${esc(a.creator||'')}</div>`;
+
+  // 参与情况
+  if(!s){
+    h+=`<div class="card"><button class="btn" style="width:100%" onclick="joinAct('${a.id}')">参加这个活动</button>
+      ${a.fee>0?`<div class="xs muted" style="text-align:center;margin-top:8px">需缴纳 ${a.fee} ${lbl(a,'fee')}（线下私下转账，系统只记账）</div>`:''}</div>`;
+  } else {
+    h+=`<div class="card">
+      <div class="row between"><div class="b">我的进度</div><span class="tag ${s.curStreak>0?'hot':''}">连续 ${s.curStreak} 天</span></div>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <div class="stat"><div class="n">${s.score}</div><div class="l">${sl}</div></div>
+        <div class="stat"><div class="n">${s.realDays}</div><div class="l">真实天数</div></div>
+        <div class="stat"><div class="n">${s.cardsHeld}</div><div class="l">${lbl(a,'card')}</div></div>
+      </div>`;
+    if(a.fee>0){
+      h+=`<div class="xs muted" style="margin-top:10px">参与金 ${a.fee}${lbl(a,'fee')}：${s.refunded?('<span class="tag on">已退还（累计真实 '+s.realDays+' 天）</span>'):('累计真实 '+s.realDays+'/'+a.refundRealDays+' 天退还')}</div>`;
+    }
+    h+=`</div>`;
+
+    // 签到按钮（独立一行，间距统一）
+    if(s.todaySigned){
+      h+=`<div class="done-badge">✅ 今天已签到</div>`;
+    } else if(s.canCheckin){
+      h+=`<button class="btn checkin-big" onclick="openCheckin('${a.id}')">今日签到</button>`;
+    } else if(!s.inCycle){
+      h+=`<div class="card xs muted" style="text-align:center">活动周期外，无法签到</div>`;
+    } else {
+      h+=`<div class="card xs muted" style="text-align:center">今天还没到签到时间</div>`;
+    }
+
+    // 使用补签卡
+    if(s.cardsHeld>0){
+      h+=`<div class="card"><div class="row between"><div class="b">${lbl(a,'card')}</div><span class="tag gold">持有 ${s.cardsHeld} 张</span></div>
+        <div class="xs muted" style="margin-top:6px">第 ${a.cardDays.join('/')} 天各发 1 张，可补本周期任意漏签日，周期结束失效</div>
+        <button class="btn" style="margin-top:10px;width:100%" onclick="openMakeup('${a.id}')">使用${lbl(a,'card')}</button></div>`;
+    } else {
+      h+=`<div class="card"><div class="row between"><div class="b">${lbl(a,'card')}</div><span class="tag">持有 0 张</span></div>
+        <div class="xs muted" style="margin-top:6px">第 ${a.cardDays.join('/')} 天各发 1 张，可补本周期任意漏签日</div></div>`;
+    }
+  }
+
+  // 奖金里程碑（连续达到某天才一次性获得该档奖金；断签后已获得的保留）
+  if(a.milestones.length){
+    h+=`<div class="card"><div class="b">${lbl(a,'score')}里程碑</div><div class="xs muted" style="margin-bottom:10px">连续签到满对应天数才可获得${lbl(a,'score')}，未达门槛当天为0</div>`;
+    let acc=0;
+    a.milestones.forEach(m=>{ acc+=m.add; const reached=s&&(s.maxStreak>=m.day); h+=`<div class="mile ${reached?'reached':''}"><div class="dot">${m.day}</div><div style="flex:1">连续满 <b>${m.day}</b> 天 → <b>${m.add}</b> ${lbl(a,'score')}</div><div class="xs muted">累计 ${acc}</div></div>`; });
+    if(s) h+=`<div class="sm" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">当前已得：<span class="a">${s.score}</span> ${lbl(a,'score')} · 历史最长连续 <b>${s.maxStreak}</b> 天</div>`;
+    h+=`</div>`;
+  }
+
+  // 日历
+  if(s){
+    h+=`<div class="card"><div class="b">我的签到（第1-${a.cycleDays}天）</div>`+calGrid(a,s)+
+      `<div class="row sm muted" style="gap:14px;margin-top:8px;flex-wrap:wrap"><span>🟩 已签</span>${a.cardDays.length>0?'<span>🟦 '+lbl(a,'card')+'</span>':''}<span>🟥 漏签</span></div></div>`;
+  }
+
+  // 排名
+  h+=`<div class="card"><div class="b">排名榜</div>
+    <div class="seg">
+      <button class="${rankMode==='score'?'on':''}" onclick="setRank('score')">${sl}</button>
+      <button class="${rankMode==='streak'?'on':''}" onclick="setRank('streak')">连续天数</button>
+    </div>${rankHTML(a)}</div>`;
+
+  // 退出活动（参加后才显示，放在排行榜下方）
+  if(s){
+    h+=`<button class="btn btn-ghost" style="width:100%;color:var(--red);background:#fbeae5;margin-top:14px" onclick="leaveAct('${a.id}')">退出活动</button>`;
+  }
+
+  document.getElementById('view').innerHTML=h;
+}
+function calGrid(a,s){
+  let h='<div class="daygrid">';
+  s.calendar.forEach(c=>{
+    const cls=c.state==='done'?'done':c.state==='makeup'?'makeup':c.state==='miss'?'miss':'future';
+    h+=`<div class="daycell ${cls}"><div class="d">${c.idx}</div><div>${c.state==='done'?'✓':c.state==='makeup'?'补':c.state==='miss'?'✗':''}</div></div>`;
+  });
+  return h+'</div>';
+}
+function rankHTML(a){
+  const sl=lbl(a,'score');
+  const arr=[...detail.participants].sort((x,y)=> rankMode==='streak'? y.curStreak-x.curStreak : y.score-x.score);
+  if(!arr.length) return '<div class="xs muted">还没有人参加</div>';
+  return arr.map((p,i)=>{
+    const no=i===0?'g1':i===1?'g2':i===2?'g3':'';
+    const val=rankMode==='streak'? p.curStreak+' 天' : p.score+' '+sl;
+    return `<div class="rank-item"><div class="rank-no ${no}">${i+1}</div>
+      <div style="flex:1"><div class="b">${esc(p.nickname)}${p.isMe?' <span class="tag on">我</span>':''}</div>
+      <div class="xs muted">连续${p.curStreak}天 · 真实${p.realDays}天${p.refunded?' · 已退'+lbl(a,'fee'):''}</div></div>
+      <div class="b" style="color:var(--accent-dark)">${val}</div></div>`;
+  }).join('');
+}
+function setRank(m){ rankMode=m; renderDetail(); }
+
+async function joinAct(id){
+  try{ await api('/api/activities/'+id+'/join',{method:'POST',body:{paid:true}}); toast('参加成功'); await showDetail(id); }
+  catch(e){ toast(e.message); }
+}
+async function leaveAct(id){
+  modal(`<div class="b" style="font-size:16px">退出活动</div>
+    <div class="sm muted" style="margin-top:8px">退出后你的签到记录、奖金、补签卡都会被清空，且无法恢复。确定要退出吗？</div>
+    <button class="btn" style="width:100%;margin-top:16px;background:var(--red)" onclick="confirmLeave('${id}')">确定退出</button>
+    <div style="text-align:center;margin-top:14px"><span class="link" onclick="closeModal()">取消</span></div>`);
+}
+async function confirmLeave(id){
+  try{ await api('/api/activities/'+id+'/leave',{method:'POST'}); closeModal(); toast('已退出活动'); await showDetail(id); }
+  catch(e){ toast(e.message); }
+}
+
+// ---------- 签到 / 补签 ----------
+function openCheckin(id){
+  const a=detail.activity; pendingCheckin=id;
+  modal(`<div class="b" style="font-size:16px">今日签到</div>
+    <div class="sm muted" style="margin-top:6px">${esc(a.taskReq||'完成今日任务')}</div>
+    <label class="chk" style="margin-top:14px"><input type="checkbox" id="taskDone"> 我已完成今天的任务</label>
+    <button class="btn" style="width:100%;margin-top:16px" onclick="confirmCheckin()">确认签到</button>
+    <div style="text-align:center;margin-top:14px"><span class="link" onclick="closeModal()">取消</span></div>`);
+}
+async function confirmCheckin(){
+  const taskDone=document.getElementById('taskDone').checked;
+  try{ const d=await api('/api/activities/'+pendingCheckin+'/checkin',{method:'POST',body:{taskDone}}); detail.me=d.state; closeModal(); toast('签到成功'); renderDetail(); }
+  catch(e){ toast(e.message); }
+}
+function openMakeup(id){
+  const a=detail.activity, s=detail.me;
+  if(s.cardsHeld<=0){ toast('没有可用的补签卡'); return; }
+  modal(`<div class="b" style="font-size:16px">使用${lbl(a,'card')}</div>
+    <div class="xs muted" style="margin-top:6px">点选本周期中红色（漏签）的某一天进行补签，消耗 1 张${lbl(a,'card')}</div>
+    ${calGridPick(a,s)}
+    <div style="text-align:center;margin-top:14px"><span class="link" onclick="closeModal()">关闭</span></div>`);
+}
+function calGridPick(a,s){
+  let h='<div class="daygrid">';
+  s.calendar.forEach(c=>{
+    const pickable=c.state==='miss';
+    const cls=c.state==='done'?'done':c.state==='makeup'?'makeup':c.state==='miss'?'miss':'future';
+    h+=`<div class="daycell ${cls} ${pickable?'pick':''}" ${pickable?`onclick="confirmMakeupAsk('${c.date}')"`:''}><div class="d">${c.idx}</div><div>${c.state==='done'?'✓':c.state==='makeup'?'补':c.state==='miss'?'✗':''}</div></div>`;
+  });
+  return h+'</div>';
+}
+function confirmMakeupAsk(date){
+  const a=detail.activity, s=detail.me;
+  const idx=s.calendar.find(c=>c.date===date).idx;
+  pendingMakeup=date;
+  modal(`<div class="b" style="font-size:16px">确认补签</div>
+    <div class="sm muted" style="margin-top:8px">补签第 <b>${idx}</b> 天（${date}）<br>将消耗 1 张${lbl(a,'card')}，补签后<b>不可撤销</b>。</div>
+    <button class="btn" style="width:100%;margin-top:16px" onclick="confirmMakeup()">确认补签</button>
+    <div style="text-align:center;margin-top:14px"><span class="link" onclick="openMakeup('${a.id}')">再想想</span></div>`);
+}
+async function confirmMakeup(){
+  try{ const d=await api('/api/activities/'+detail.activity.id+'/makeup',{method:'POST',body:{date:pendingMakeup}}); detail.me=d.state; closeModal(); toast('补签成功'); renderDetail(); }
+  catch(e){ toast(e.message); }
+}
+
+// ---------- 我的 ----------
+async function showMe(){
+  view='me'; setNav('nav_me');
+  const wrap=document.getElementById('view'); wrap.innerHTML='<div class="title">我的</div><div class="sub">我参加的活动与进度</div><div class="empty">加载中…</div>';
+  let list;
+  try{ list=await api('/api/me/activities'); }catch(e){ wrap.innerHTML='<div class="empty">'+esc(e.message)+'</div>'; return; }
+  if(!list.length){ wrap.innerHTML='<div class="title">我的</div><div class="sub">我参加的活动与进度</div><div class="empty">你还没参加任何活动<br>去「活动」里挑一个吧</div>'; return; }
+  let h='<div class="title">我的</div><div class="sub">我参加的活动与进度</div>';
+  list.forEach(o=>{
+    const a=o.activity, s=o.state;
+    h+=`<div class="card act-card" onclick="showDetail('${a.id}')">
+      <div class="row between"><div class="b">${a.icon||'📋'} ${esc(a.name)}</div><span class="tag ${s.curStreak>0?'hot':''}">连续 ${s.curStreak} 天</span></div>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <div class="stat"><div class="n">${s.score}</div><div class="l">${lbl(a,'score')}</div></div>
+        <div class="stat"><div class="n">${s.realDays}</div><div class="l">真实天数</div></div>
+        <div class="stat"><div class="n">${s.cardsHeld}</div><div class="l">${lbl(a,'card')}</div></div>
+      </div>
+      ${a.fee>0?`<div class="xs muted" style="margin-top:8px">参与金：${s.refunded?'<span class="tag on">已退还</span>':'累计真实 '+s.realDays+'/'+a.refundRealDays+' 天退还'}</div>`:''}
+    </div>`;
+  });
+  wrap.innerHTML=h;
+}
+
+function setNav(id){ ['nav_list','nav_new','nav_me'].forEach(n=>document.getElementById(n).classList.toggle('active',n===id)); }
+
+// ---------- 启动 ----------
+if(TOKEN){ enter(); } else { boot(); }
+</script>
+</body>
+</html>
