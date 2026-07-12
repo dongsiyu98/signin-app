@@ -406,6 +406,47 @@ app.post('/api/activities/:id/grant-card', auth, ensureUser, (req, res) => {
   res.json({ ok: true, userId, cardsBonus: p2.cards_bonus, cardsHeld: s.cardsHeld });
 });
 
+// ----- 部署回调（GitHub Actions 通过 HTTP 推源码到 3000 端口）-----
+const DEPLOY_SECRET = process.env.DEPLOY_SECRET || '';
+app.post('/api/deploy', (req, res) => {
+  const secret = req.headers['x-deploy-secret'];
+  if (!DEPLOY_SECRET || secret !== DEPLOY_SECRET) {
+    console.error('deploy: 拒绝未授权的部署请求');
+    return res.status(403).json({ error: 'unauthorized' });
+  }
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    const buf = Buffer.concat(chunks);
+    const tmpFile = path.join(__dirname, 'deploy_tmp.tar.gz');
+    try {
+      fs.writeFileSync(tmpFile, buf);
+      const { execSync } = require('child_process');
+      console.log('deploy: 备份生产库...');
+      execSync('node backup-db.js backup', { cwd: __dirname, stdio: 'pipe', timeout: 30000 });
+      console.log('deploy: 解压覆盖源码...');
+      execSync('tar xzf deploy_tmp.tar.gz && rm -f deploy_tmp.tar.gz', { cwd: __dirname, stdio: 'pipe', timeout: 30000 });
+      console.log('deploy: 源码已更新，准备重启 pm2...');
+      res.json({ ok: true, message: '部署完成，pm2 即将重启' });
+      setTimeout(() => {
+        const { exec } = require('child_process');
+        exec('pm2 restart signin', { cwd: __dirname, env: { ...process.env, PATH: '/usr/local/node-v22.14.0-linux-x64/bin:' + process.env.PATH } }, (err) => {
+          if (err) console.error('deploy: pm2 restart 失败', err.message);
+          else console.log('deploy: pm2 restart 成功');
+        });
+      }, 1500);
+    } catch (e) {
+      try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch {}
+      console.error('deploy 失败:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  req.on('error', e => {
+    console.error('deploy: 读取请求体失败', e.message);
+    res.status(500).json({ error: 'body read error' });
+  });
+});
+
 // SPA 兜底
 app.get('*', (req, res) => res.sendFile(path.join(publicDir, 'index.html')));
 

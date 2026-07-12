@@ -28,31 +28,18 @@ jobs:
               .env.example backup-db.js deploy-tencent.sh TENCENT_DEPLOY.md README.md "API文档.md"
           ls -lh deploy.tar.gz
 
-      # 2) 上传到服务器（仅源码，不动 signin.db / .env）
-      - name: Upload to server
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "deploy.tar.gz"
-          target: "~/signin-app"
-
-      # 3) 备份生产库 -> 就地解压 -> 重启 pm2
-      - name: Extract & restart
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            cd ~/signin-app
-            export PATH=/usr/local/node-v22.14.0-linux-x64/bin:$PATH
-            echo "===== 部署前备份生产库 ====="
-            node backup-db.js backup
-            echo "===== 就地解压源码（不碰 signin.db/.env） ====="
-            tar xzf deploy.tar.gz
-            rm -f deploy.tar.gz
-            echo "===== 重启 pm2 ====="
-            pm2 restart signin
-            pm2 status
+      # 2) 通过 HTTP 部署回调推送到服务器 3000 端口（无需 SSH/防火墙放行 22）
+      - name: Deploy via HTTP callback
+        run: |
+          echo "=== 推送源码包到部署接口 ==="
+          HTTP_CODE=$(curl -sS -m 60 \
+            -H "x-deploy-secret: ${{ secrets.DEPLOY_SECRET }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@deploy.tar.gz" \
+            -o /tmp/deploy_response.json \
+            -w "%{http_code}" \
+            http://114.132.121.192:3000/api/deploy)
+          echo "HTTP $HTTP_CODE"
+          echo "=== 服务器响应 ==="
+          cat /tmp/deploy_response.json
+          if [ "$HTTP_CODE" != "200" ]; then exit 1; fi
