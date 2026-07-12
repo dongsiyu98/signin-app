@@ -78,6 +78,7 @@ signin-app/
   package.json
   .env.example     # 配置样例（PORT / DB_PATH / JWT_SECRET / SIMULATED_TODAY）
   signin.db        # 运行时自动生成的数据库（勿提交）
+  .github/workflows/deploy.yml  # 自动部署流水线（push main → 备份+上传+重启 pm2）
 ```
 
 ## 六、API 一览
@@ -124,4 +125,52 @@ node tests/test_frontend.js
 ```
 
 > 测试使用独立的 `tests/test_signin.db`，不会污染你的真实数据 `signin.db`；验证完可直接删除 `tests/test_signin.db`。
+
+---
+
+## 八、自动部署（GitHub Actions：push 即上线）
+
+> 服务器在国内，**连不上 github.com（443 超时）**，所以采用**推式**部署：你 push 后由 GitHub 云端 runner 把源码 scp 到服务器并重启，而不是服务器自己 `git pull`。
+
+### 工作原理
+每次 `git push origin main` 触发 `.github/workflows/deploy.yml`（`concurrency` 防并发）：
+
+1. **Checkout** 最新代码
+2. **打包**：在 runner 上 `tar` 打源码包，自动排除 `signin.db*` / `.env` / `node_modules` / `backups` / `deploy_remote.py`
+3. **上传**：`appleboy/scp-action` 把 `deploy.tar.gz` 传到服务器 `~/signin-app`
+4. **部署**：`appleboy/ssh-action` 在服务器执行
+   ```bash
+   cd ~/signin-app
+   export PATH=/usr/local/node-v22.14.0-linux-x64/bin:$PATH
+   node backup-db.js backup        # 部署前自动备份生产库
+   tar xzf deploy.tar.gz           # 就地解压，只覆盖源码，不动 signin.db / .env
+   rm -f deploy.tar.gz
+   pm2 restart signin              # 重启服务
+   ```
+
+**安全保障**
+- 全程**不碰 `signin.db` / `.env`**——生产数据零丢失
+- 部署前自动备份到 `~/signin-app/backups/<时间戳>/`，可据此回滚数据库
+- 用一把**独立的部署密钥**（ed25519，注释 `github-actions-deploy@signin`），与你本人登录密钥分开
+
+### 首次配置（一次性）
+1. 仓库 **Settings → Secrets and variables → Actions** 添加 3 个 Secret：
+   | Name | Value |
+   |---|---|
+   | `SERVER_HOST` | `114.132.121.192` |
+   | `SERVER_USER` | `ubuntu` |
+   | `SERVER_SSH_KEY` | 部署私钥全文（含 `-----BEGIN/END-----` 两行） |
+2. **腾讯云防火墙**放行 **TCP 22**（来源 `0.0.0.0/0` 或 GitHub Actions IP 段）。
+
+### 日常使用
+- 改完代码 → `git push origin main` → 自动部署，无需手动操作
+- 首次 push 时若 Secrets/防火墙还没配好，工作流会红 ✗；配好后在 **Actions** 页面点 **Re-run all jobs** 即可
+- 部署进度在仓库 **Actions** 标签页查看
+
+### 回滚 / 手动兜底
+- 代码回滚：`git revert <提交>` 再 push，自动重新部署旧版
+- 数据库恢复：用 `~/signin-app/backups/<时间戳>/` 里的 `signin.db` 覆盖回去
+- 手动更新（不用 Actions）：参考上面的部署命令，scp 打包 + `pm2 restart signin`
+
+> ⚠️ 不要用仓库里的 `deploy_remote.py`——那是"全新安装"脚本，会 `rm -rf ~/signin-app` 把生产库连根删掉。它已被加入 `.gitignore`，不会进仓库。日常更新一律走上面的自动部署或手动 scp。
 
