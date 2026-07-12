@@ -79,8 +79,8 @@ sudo npm install -g pm2
 git clone https://github.com/dongsiyu98/signin-app.git ~/signin-app
 cd ~/signin-app && npm install
 
-# 4. 写配置
-echo "JWT_SECRET=***REMOVED***" > .env
+# 4. 写配置（JWT_SECRET 随机生成，切勿写死明文）
+echo "JWT_SECRET=$(openssl rand -hex 32)" > .env
 echo "PORT=3000" >> .env
 
 # 5. 启动

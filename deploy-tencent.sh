@@ -9,8 +9,8 @@ set -e
 
 REPO="https://github.com/dongsiyu98/signin-app.git"
 APP_DIR="$HOME/signin-app"
-# 与 DOM Cloud / Serv00 方案一致，避免朋友 token 被默认 dev 值串号
-JWT_SECRET="***REMOVED***"
+# JWT_SECRET 用作密码哈希盐：请通过环境变量传入，未设置则自动生成随机值（切勿写死明文）
+JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
 
 echo "== 1. 安装 Node.js 22（node:sqlite 需要 >=22.5）=="
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
