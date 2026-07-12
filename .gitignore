@@ -19,3 +19,7 @@ signin.db.bak.*
 
 # 危险的"全新安装"脚本：会 rm -rf ~/signin-app 删生产库，严禁入库
 deploy_remote.py
+
+# 本地部署脚本（含服务器 IP/用户名，禁止入库）
+deploy.bat
+push_deploy.bat

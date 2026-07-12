@@ -78,7 +78,8 @@ signin-app/
   package.json
   .env.example     # 配置样例（PORT / DB_PATH / JWT_SECRET / SIMULATED_TODAY）
   signin.db        # 运行时自动生成的数据库（勿提交）
-  .github/workflows/deploy.yml  # 自动部署流水线（push main → 备份+上传+重启 pm2）
+  deploy.bat       # 本地一键部署工具：push + scp + 重启（勿提交，含服务器 IP）
+  .github/workflows/deploy.yml  # 自动部署工作流（留存参考，实际因网络限制不可用，见第八章）
 ```
 
 ## 六、API 一览
@@ -128,49 +129,69 @@ node tests/test_frontend.js
 
 ---
 
-## 八、自动部署（GitHub Actions：push 即上线）
+## 八、部署上线（验证通过的方案）
 
-> 服务器在国内，**连不上 github.com（443 超时）**，所以采用**推式**部署：你 push 后由 GitHub 云端 runner 把源码 scp 到服务器并重启，而不是服务器自己 `git pull`。
+> 服务器为腾讯云轻量应用服务器（114.132.121.192），Node v22.14.0 + pm2 进程守护。
+> 国内服务器与 GitHub Actions runner（美国 Azure 数据中心）之间无跨中美路由，**自动部署工作流不可行**。
+> 最终采用**本地一键部署脚本**方案。
 
-### 工作原理
-每次 `git push origin main` 触发 `.github/workflows/deploy.yml`（`concurrency` 防并发）：
+### 前置要求
 
-1. **Checkout** 最新代码
-2. **打包**：在 runner 上 `tar` 打源码包，自动排除 `signin.db*` / `.env` / `node_modules` / `backups` / `deploy_remote.py`
-3. **上传**：`appleboy/scp-action` 把 `deploy.tar.gz` 传到服务器 `~/signin-app`
-4. **部署**：`appleboy/ssh-action` 在服务器执行
-   ```bash
-   cd ~/signin-app
-   export PATH=/usr/local/node-v22.14.0-linux-x64/bin:$PATH
-   node backup-db.js backup        # 部署前自动备份生产库
-   tar xzf deploy.tar.gz           # 就地解压，只覆盖源码，不动 signin.db / .env
-   rm -f deploy.tar.gz
-   pm2 restart signin              # 重启服务
-   ```
+- 本机有 SSH 密钥 `~/.ssh/id_ed25519_signin`（公钥已写入服务器 `ubuntu` 的 `authorized_keys`）
+- 服务器已装好 Node 22.5+、pm2，项目在 `~/signin-app` 下运行
 
-**安全保障**
+### 日常部署
+
+改完代码后，**双击 `deploy.bat`**（或从终端运行），自动完成：
+
+```
+┌─ git push origin main ───────────────────────────┐
+│  推代码到 GitHub（保存历史、团队协作）              │
+└───────────────────────────────────────────────────┘
+                        ↓
+┌─ 本地打包 ───────────────────────────────────────┐
+│  tar 打包 server.js / public / tests / 配置文件   │
+│  自动排除 signin.db* / .env / node_modules        │
+└───────────────────────────────────────────────────┘
+                        ↓
+┌─ SCP 上传到服务器 ───────────────────────────────┐
+│  scp deploy_tmp.tar.gz → ~/signin-app/           │
+└───────────────────────────────────────────────────┘
+                        ↓
+┌─ 服务器部署 ─────────────────────────────────────┐
+│  ① node backup-db.js backup   （自动备份生产库）  │
+│  ② tar xzf deploy_tmp.tar.gz  （就地解压覆盖源码）│
+│  ③ rm -f deploy_tmp.tar.gz    （清理临时文件）    │
+│  ④ pm2 restart signin         （重启服务）        │
+└───────────────────────────────────────────────────┘
+```
+
+**安全和数据保障**
 - 全程**不碰 `signin.db` / `.env`**——生产数据零丢失
-- 部署前自动备份到 `~/signin-app/backups/<时间戳>/`，可据此回滚数据库
-- 用一把**独立的部署密钥**（ed25519，注释 `github-actions-deploy@signin`），与你本人登录密钥分开
+- 部署前自动备份数据库到 `~/signin-app/backups/<时间戳>/`，可据此回滚
+- `deploy.bat` 已加入 `.gitignore`，防止意外将服务器 IP 暴露进公开仓库
+- 服务器上也有 `POST /api/deploy` 接口（依赖 `DEPLOY_SECRET` 密钥认证），可用于未来其他自动化途径
 
-### 首次配置（一次性）
-1. 仓库 **Settings → Secrets and variables → Actions** 添加 3 个 Secret：
-   | Name | Value |
-   |---|---|
-   | `SERVER_HOST` | `114.132.121.192` |
-   | `SERVER_USER` | `ubuntu` |
-   | `SERVER_SSH_KEY` | 部署私钥全文（含 `-----BEGIN/END-----` 两行） |
-2. **腾讯云防火墙**放行 **TCP 22**（来源 `0.0.0.0/0` 或 GitHub Actions IP 段）。
+### 首次配置（已配好，无需操作）
 
-### 日常使用
-- 改完代码 → `git push origin main` → 自动部署，无需手动操作
-- 首次 push 时若 Secrets/防火墙还没配好，工作流会红 ✗；配好后在 **Actions** 页面点 **Re-run all jobs** 即可
-- 部署进度在仓库 **Actions** 标签页查看
+以下已在部署时一次性完成：
+
+| 配置项 | 位置 | 值 |
+|---|---|---|
+| SSH 部署密钥 | 本机 `~/.ssh/id_ed25519_signin` | 公钥已写入服务器 |
+| `DEPLOY_SECRET` | 服务器 `~/signin-app/.env` + GitHub Secrets | 随机生成（`6287abb0…`） |
+| pm2 进程守护 | 服务器 | `pm2 start signin`，自动重启 |
+| 腾讯云防火墙 | 控制台 → 防火墙 | TCP 3000（公网访问）/ TCP 22（SSH 管理）已放行 |
+
+### GitHub Actions 工作流（留存参考）
+
+`.github/workflows/deploy.yml` 代码逻辑正确（HTTP 回调推送到 3000 端口的 `/api/deploy` 接口），但 **GitHub 云端 runner（美国 Azure 数据中心）无法连到国内服务器**，所有连接均 `Connection timed out`。该文件留作参考，实际部署请用上方 `deploy.bat`。
 
 ### 回滚 / 手动兜底
-- 代码回滚：`git revert <提交>` 再 push，自动重新部署旧版
-- 数据库恢复：用 `~/signin-app/backups/<时间戳>/` 里的 `signin.db` 覆盖回去
-- 手动更新（不用 Actions）：参考上面的部署命令，scp 打包 + `pm2 restart signin`
 
-> ⚠️ 不要用仓库里的 `deploy_remote.py`——那是"全新安装"脚本，会 `rm -rf ~/signin-app` 把生产库连根删掉。它已被加入 `.gitignore`，不会进仓库。日常更新一律走上面的自动部署或手动 scp。
+- **代码回滚**：`git revert <提交>` 再跑 `deploy.bat` 重新部署
+- **数据库恢复**：服务器 `~/signin-app/backups/<时间戳>/` 下的 `signin.db` 覆盖回项目目录
+- **纯手动更新**：本机 `tar` 打包 → `scp` 上传 → SSH 登录执行备份/解压/重启
+
+> ⚠️ **不要使用 `deploy_remote.py`**——它是"全新安装"脚本，会 `rm -rf ~/signin-app` 把生产库连根删掉（且 `REPO` 变量未定义，直接跑会报错）。已被加入 `.gitignore`，永不入库。日常更新一律走 `deploy.bat` 或手动 scp。
 
