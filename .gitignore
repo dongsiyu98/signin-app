@@ -16,3 +16,6 @@ signin.db.bak.*
 # 日志与系统文件
 *.log
 .DS_Store
+
+# 危险的"全新安装"脚本：会 rm -rf ~/signin-app 删生产库，严禁入库
+deploy_remote.py

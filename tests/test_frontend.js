@@ -135,6 +135,28 @@ function ok(name, cond, extra) { console.log(`${cond ? '✅' : '❌'} ${name}${e
   ok('退出后详情页恢复「参加这个活动」按钮', vh.includes('参加这个活动'));
   ok('退出后详情页不再显示「退出」按钮', !vh.includes('退出'));
 
+  // 9. 举办人删除活动（UI 流程）
+  const created2 = await window.api('/api/activities', { method: 'POST', body: act });
+  const aid2 = created2.id;
+  await window.showDetail(aid2); await wait(120);
+  let vh3 = document.getElementById('view').innerHTML;
+  ok('举办人可见「删除活动」按钮', vh3.includes('删除活动'));
+  ok('删除按钮调用 deleteAct', vh3.includes('onclick="deleteAct('));
+  // 点击删除 -> 弹确认 modal
+  await window.deleteAct(aid2); await wait(80);
+  const modal2 = document.querySelector('.modal-bg');
+  ok('点击删除弹出确认 modal', !!modal2 && (modal2.textContent || '').includes('删除'));
+  ok('确认框含「确定删除」按钮', !!(modal2 && modal2.innerHTML.includes('confirmDelete')));
+  // 确认删除 -> 调用接口 -> 跳回列表
+  await window.confirmDelete(aid2); await wait(200);
+  // 删除后活动不存在：详情接口应抛「不存在」错误
+  let deleted = false;
+  try { await window.api('/api/activities/' + aid2); } catch (e) { deleted = /不存在/.test(e.message); }
+  ok('确认删除后 活动已不存在(详情接口报错)', deleted);
+  // 列表不应含该活动
+  const list2 = await window.api('/api/activities');
+  ok('确认删除后 列表不含该活动', Array.isArray(list2) && !list2.some(x => x.id === aid2));
+
   console.log(`\n=== 前端集成测试：${pass} 通过 / ${fail} 失败 ===`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('测试异常:', e); process.exit(1); });

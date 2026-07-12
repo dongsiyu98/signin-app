@@ -102,6 +102,18 @@ function localDate(offset) {
   check('退出已参加 -> 200', (r = await call('POST', '/api/activities/' + aid + '/leave', tokB)).status === 200, 'HTTP ' + r.status);
   check('退出后再退出 -> 400', (r = await call('POST', '/api/activities/' + aid + '/leave', tokB)).status === 400, 'HTTP ' + r.status);
 
+  console.log('\n--- F. 举办人删除活动边界 ---');
+  // 非举办人(客人)删除 -> 403
+  check('非举办人(客人)删除 -> 403', (r = await call('DELETE', '/api/activities/' + aid, tokB)).status === 403, 'HTTP ' + r.status);
+  // 删除不存在活动 -> 404
+  check('删除不存在活动 -> 404', (r = await call('DELETE', '/api/activities/' + fakeId, tokA)).status === 404, 'HTTP ' + r.status);
+  // 客人重新参加，便于验证级联清除
+  r = await call('POST', '/api/activities/' + aid + '/join', tokB, { paid: true });
+  check('客人重新参加 -> 200', r.status === 200, 'HTTP ' + r.status);
+  // 举办人删除 -> 200
+  check('举办人删除 -> 200', (r = await call('DELETE', '/api/activities/' + aid, tokA)).status === 200, 'HTTP ' + r.status);
+  check('举办人删除后 详情 404', (r = await call('GET', '/api/activities/' + aid, tokA)).status === 404, 'HTTP ' + r.status);
+
   console.log(`\n=== 边界用例测试：${pass} 通过 / ${fail} 失败 ===`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('测试异常:', e); process.exit(1); });

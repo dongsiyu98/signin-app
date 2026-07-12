@@ -161,6 +161,37 @@ const ACT = {
   r = await call('POST', `/api/activities/${aid}/leave`, tokA);
   check('重复退出 -> 400', r.status === 400, 'HTTP ' + r.status);
 
+  // ===== 举办人删除活动 =====
+  // 新建一个待删活动（小明=举办人），小红参加
+  r = await call('POST', '/api/activities', tokA, { ...ACT, name: ACT.name + '·待删' });
+  const delAid = r.data && r.data.id;
+  check('删除测试：创建待删活动', !!delAid, 'HTTP ' + r.status);
+  r = await call('POST', `/api/activities/${delAid}/join`, tokB, { paid: true });
+  check('删除测试：小红已参加待删活动', ok2xx(r.status), 'HTTP ' + r.status);
+
+  // 非举办人(小红)删除 -> 403
+  r = await call('DELETE', `/api/activities/${delAid}`, tokB);
+  check('非举办人删除 -> 403', r.status === 403, 'HTTP ' + r.status);
+
+  // 删除不存在活动 -> 404
+  r = await call('DELETE', '/api/activities/nonexist_del_123', tokA);
+  check('删除不存在活动 -> 404', r.status === 404, 'HTTP ' + r.status);
+
+  // 举办人(小明)删除 -> 200 + ok=true
+  r = await call('DELETE', `/api/activities/${delAid}`, tokA);
+  check('举办人删除 -> 成功(2xx)', ok2xx(r.status), 'HTTP ' + r.status);
+  check('删除响应 ok=true', r.data && r.data.ok === true, JSON.stringify(r.data));
+
+  // 删除后：详情不可见
+  r = await call('GET', `/api/activities/${delAid}`, tokA);
+  check('删除后 详情 404', r.status === 404, 'HTTP ' + r.status);
+  // 删除后：列表不含该活动
+  r = await call('GET', '/api/activities', null);
+  check('删除后 列表不含该活动', Array.isArray(r.data) && !r.data.some(x => x.id === delAid));
+  // 删除后：级联清除参与/签到，原参与者再查详情也 404
+  r = await call('GET', `/api/activities/${delAid}`, tokB);
+  check('删除后 原参与者再查详情 404', r.status === 404, 'HTTP ' + r.status);
+
   console.log(`\n=== API 集成测试：${pass} 通过 / ${fail} 失败 ===`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('测试异常:', e); process.exit(1); });

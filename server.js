@@ -376,6 +376,18 @@ app.post('/api/activities/:id/leave', auth, ensureUser, (req, res) => {
   res.json({ ok: true });
 });
 
+// 举办人删除活动（级联删除其下参与记录与签到记录；纯记分，无需退真实款项）
+app.delete('/api/activities/:id', auth, ensureUser, (req, res) => {
+  const a = arow(db.prepare('SELECT * FROM activities WHERE id=?').get(req.params.id));
+  if (!a) return res.status(404).json({ error: '活动不存在' });
+  if (a.creatorId !== req.uid) return res.status(403).json({ error: '只有活动举办人才能删除活动' });
+  // 先清签到，再清参与，最后删活动本体
+  db.prepare('DELETE FROM checkins WHERE activity_id=?').run(a.id);
+  db.prepare('DELETE FROM participations WHERE activity_id=?').run(a.id);
+  db.prepare('DELETE FROM activities WHERE id=?').run(a.id);
+  res.json({ ok: true });
+});
+
 // 举办人给参与者发放补签卡（叠加 cards_bonus，与系统按 cardDays 自动发放互不冲突）
 app.post('/api/activities/:id/grant-card', auth, ensureUser, (req, res) => {
   const a = arow(db.prepare('SELECT * FROM activities WHERE id=?').get(req.params.id));

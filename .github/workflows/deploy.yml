@@ -1,0 +1,58 @@
+name: Deploy to Tencent server
+
+on:
+  push:
+    branches: [main]
+
+# 同一时间只跑一个部署，避免并发覆盖
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1) 在 runner 上打源码包，明确排除生产库/密钥/依赖
+      - name: Pack source (exclude DB/.env/node_modules)
+        run: |
+          tar --exclude='signin.db' --exclude='signin.db-wal' --exclude='signin.db-shm' \
+              --exclude='.env' --exclude='node_modules' --exclude='.git' --exclude='backups' \
+              --exclude='deploy_remote.py' \
+              -czf deploy.tar.gz \
+              server.js public tests package.json package-lock.json \
+              .env.example backup-db.js deploy-tencent.sh TENCENT_DEPLOY.md README.md "API文档.md"
+          ls -lh deploy.tar.gz
+
+      # 2) 上传到服务器（仅源码，不动 signin.db / .env）
+      - name: Upload to server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "deploy.tar.gz"
+          target: "~/signin-app"
+
+      # 3) 备份生产库 -> 就地解压 -> 重启 pm2
+      - name: Extract & restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ~/signin-app
+            export PATH=/usr/local/node-v22.14.0-linux-x64/bin:$PATH
+            echo "===== 部署前备份生产库 ====="
+            node backup-db.js backup
+            echo "===== 就地解压源码（不碰 signin.db/.env） ====="
+            tar xzf deploy.tar.gz
+            rm -f deploy.tar.gz
+            echo "===== 重启 pm2 ====="
+            pm2 restart signin
+            pm2 status

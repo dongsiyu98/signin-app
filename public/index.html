@@ -393,6 +393,11 @@ function renderDetail(){
     h+=`<button class="btn btn-ghost" style="width:100%;color:var(--red);background:#fbeae5;margin-top:14px" onclick="leaveAct('${a.id}')">退出活动</button>`;
   }
 
+  // 删除活动（仅举办人可见，危险操作，单独置顶提示）
+  if(isCreator){
+    h+=`<button class="btn btn-ghost" style="width:100%;color:#fff;background:var(--red);margin-top:14px" onclick="deleteAct('${a.id}')">🗑 删除活动（仅举办人）</button>`;
+  }
+
   document.getElementById('view').innerHTML=h;
 }
 function calGrid(a,s){
@@ -438,6 +443,16 @@ async function grantCard(activityId, userId){
     toast('已发 1 张'+lbl(detail.activity,'card')+'，该用户现持有 '+d.cardsHeld+' 张');
     await showDetail(activityId);
   }catch(e){ toast(e.message); }
+}
+async function deleteAct(id){
+  modal(`<div class="b" style="font-size:16px">删除活动</div>
+    <div class="sm muted" style="margin-top:8px">删除后该活动、所有参加者的签到记录与积分都会被永久清除，且无法恢复。确定要删除吗？</div>
+    <button class="btn" style="width:100%;margin-top:16px;background:var(--red)" onclick="confirmDelete('${id}')">确定删除</button>
+    <div style="text-align:center;margin-top:14px"><span class="link" onclick="closeModal()">取消</span></div>`);
+}
+async function confirmDelete(id){
+  try{ await api('/api/activities/'+id,{method:'DELETE'}); closeModal(); toast('活动已删除'); await showList(); }
+  catch(e){ toast(e.message); }
 }
 
 // ---------- 签到 / 补签 ----------
